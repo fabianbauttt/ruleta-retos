@@ -770,8 +770,8 @@ const pointerEl = document.getElementById("pointer");
 let currentRotation = 0;
 let lastTickIndex = -1;
 
-function easeOutQuint(t){
-  return 1 - Math.pow(1 - t, 5);
+function easeOutCubic(t){
+  return 1 - Math.pow(1 - t, 3);
 }
 
 function normalizedIndexFromRotation(rotationDeg){
@@ -820,7 +820,7 @@ function spin(){
     if(startTime === null) startTime = ts;
     const elapsed = ts - startTime;
     const t = Math.min(elapsed / duration, 1);
-    const eased = easeOutQuint(t);
+    const eased = easeOutCubic(t);
     const rotationNow = startRotation + delta * eased;
 
     wheelDisc.style.transform = "rotate(" + rotationNow + "deg)";
