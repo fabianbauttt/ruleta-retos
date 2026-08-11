@@ -157,10 +157,12 @@ button{font-family:inherit;}
   border-radius:50%;
   transform-origin:50% 50%;
   will-change:transform;
-  filter:drop-shadow(0 10px 30px rgba(0,0,0,.55));
-  /* Fuerza la promoción a su propia capa GPU/compositor en Safari/WebKit,
-     evitando el repintado en software que congela el último tramo del
-     giro en iOS/macOS Safari. */
+  /* OJO: sin filter:drop-shadow aquí a propósito. Aplicado sobre este
+     elemento (que rota en cada frame), Safari/WebKit re-rasteriza la
+     sombra completa en cada frame en vez de solo mover una capa ya
+     compuesta, lo que congela el hilo principal en el tramo final del
+     giro. La sombra de profundidad se movió a .wheel-rim, que tiene el
+     mismo tamaño/posición pero NUNCA rota. */
   -webkit-backface-visibility:hidden;
   backface-visibility:hidden;
   transform-style:preserve-3d;
@@ -176,7 +178,8 @@ button{font-family:inherit;}
   box-shadow:
     0 0 0 1px rgba(255,255,255,.03) inset,
     0 0 34px 4px rgba(183,132,255,.20),
-    0 0 60px 10px rgba(0,229,255,.10);
+    0 0 60px 10px rgba(0,229,255,.10),
+    0 10px 30px rgba(0,0,0,.55);
 }
 
 .segment-label{
@@ -837,7 +840,7 @@ function spin(){
     const eased = easeOutQuint(t);
     const rotationNow = startRotation + delta * eased;
 
-    wheelDisc.style.transform = "rotate(" + rotationNow + "deg) translateZ(0)";
+    wheelDisc.style.transform = "rotate(" + rotationNow.toFixed(2) + "deg) translateZ(0)";
 
     const idxNow = normalizedIndexFromRotation(rotationNow);
     if(idxNow !== lastTickIndex){
@@ -856,7 +859,7 @@ function spin(){
 
 function finishSpin(finalRotation){
   currentRotation = finalRotation;
-  wheelDisc.style.transform = "rotate(" + finalRotation + "deg) translateZ(0)";
+  wheelDisc.style.transform = "rotate(" + finalRotation.toFixed(2) + "deg) translateZ(0)";
   isSpinning = false;
   wheelWrapEl.classList.remove("spinning");
   wheelWrapEl.classList.add("landed");
