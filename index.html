@@ -158,6 +158,12 @@ button{font-family:inherit;}
   transform-origin:50% 50%;
   will-change:transform;
   filter:drop-shadow(0 10px 30px rgba(0,0,0,.55));
+  /* Fuerza la promoción a su propia capa GPU/compositor en Safari/WebKit,
+     evitando el repintado en software que congela el último tramo del
+     giro en iOS/macOS Safari. */
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  transform-style:preserve-3d;
 }
 .wheel-disc svg{display:block;width:100%;height:100%;}
 
@@ -198,13 +204,10 @@ button{font-family:inherit;}
   filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));
 }
 .pointer svg{width:100%;height:100%;display:block;}
-@keyframes pointerTick{
-  0%{transform:translateX(-50%) rotate(0deg);}
-  30%{transform:translateX(-50%) rotate(-14deg);}
-  60%{transform:translateX(-50%) rotate(9deg);}
-  100%{transform:translateX(-50%) rotate(0deg);}
-}
-.pointer.tick{animation:pointerTick .18s ease-out;}
+/* La animación del "tick" del puntero ahora se dispara vía Element.animate()
+   (Web Animations API) desde triggerTick() en JS, en vez de @keyframes +
+   toggle de clase. Eso evita el reflow síncrono (offsetWidth) que causaba
+   layout thrashing y congelaba el hilo principal en Safari/WebKit. */
 
 /* --- Hub central = botón GIRAR --- */
 .hub{
@@ -418,7 +421,6 @@ button{font-family:inherit;}
 @media (prefers-reduced-motion: reduce){
   .hub.idle-pulse{animation:none;}
   .bulb{transition:none;}
-  .pointer.tick{animation:none;}
   .wheel-wrap.landed .wheel-rim{animation:none;}
   .modal-card{transition:opacity .2s ease;}
   .wheel-disc{transition:none !important;}
@@ -770,8 +772,8 @@ const pointerEl = document.getElementById("pointer");
 let currentRotation = 0;
 let lastTickIndex = -1;
 
-function easeOutCubic(t){
-  return 1 - Math.pow(1 - t, 3);
+function easeOutQuint(t){
+  return 1 - Math.pow(1 - t, 5);
 }
 
 function normalizedIndexFromRotation(rotationDeg){
@@ -781,10 +783,22 @@ function normalizedIndexFromRotation(rotationDeg){
 
 function triggerTick(){
   AudioManager.tick();
-  pointerEl.classList.remove("tick");
-  // Forzar reflow para poder reiniciar la animación
-  void pointerEl.offsetWidth;
-  pointerEl.classList.add("tick");
+  // Web Animations API en vez de toggle de clase + offsetWidth: evita el
+  // reflow síncrono (layout thrashing) que congelaba el hilo principal en
+  // Safari/WebKit durante el tramo final del giro. Cada llamada crea su
+  // propia animación independiente, así que ticks superpuestos no se
+  // interrumpen entre sí.
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduceMotion) return;
+  pointerEl.animate([
+    { transform: 'translateX(-50%) rotate(0deg)' },
+    { transform: 'translateX(-50%) rotate(-14deg)' },
+    { transform: 'translateX(-50%) rotate(9deg)' },
+    { transform: 'translateX(-50%) rotate(0deg)' }
+  ], {
+    duration: 180,
+    easing: 'ease-out'
+  });
 }
 
 function spin(){
@@ -820,10 +834,10 @@ function spin(){
     if(startTime === null) startTime = ts;
     const elapsed = ts - startTime;
     const t = Math.min(elapsed / duration, 1);
-    const eased = easeOutCubic(t);
+    const eased = easeOutQuint(t);
     const rotationNow = startRotation + delta * eased;
 
-    wheelDisc.style.transform = "rotate(" + rotationNow + "deg)";
+    wheelDisc.style.transform = "rotate(" + rotationNow + "deg) translateZ(0)";
 
     const idxNow = normalizedIndexFromRotation(rotationNow);
     if(idxNow !== lastTickIndex){
@@ -842,7 +856,7 @@ function spin(){
 
 function finishSpin(finalRotation){
   currentRotation = finalRotation;
-  wheelDisc.style.transform = "rotate(" + finalRotation + "deg)";
+  wheelDisc.style.transform = "rotate(" + finalRotation + "deg) translateZ(0)";
   isSpinning = false;
   wheelWrapEl.classList.remove("spinning");
   wheelWrapEl.classList.add("landed");
