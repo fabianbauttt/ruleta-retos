@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruleta de Consecuencias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   0. VARIABLES Y RESET
+   ============================================================ */
+:root{
+  --bg-deep:#0a0a0d;
+  --bg-panel:#141418;
+  --bg-panel-2:#1c1c22;
+  --line:#2a2a33;
+
+  --neon-cyan:#00e5ff;
+  --neon-magenta:#ff2e9a;
+  --neon-amber:#ffc93f;
+  --neon-violet:#b784ff;
+  --neon-lime:#c6ff4d;
+  --neon-orange:#ff8a3d;
+  --neon-blue:#4fa8ff;
+  --neon-rose:#ff5c7a;
+
+  --gold:#f7c948;
+
+  --text-hi:#f5f5f8;
+  --text-mid:#b9b9c4;
+  --text-dim:#6f6f7a;
+
+  --font-display:'Orbitron', 'Rajdhani', sans-serif;
+  --font-body:'Rajdhani', 'Segoe UI', sans-serif;
+
+  --spin-duration: 4600ms;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(183,132,255,0.10), transparent 60%),
+    radial-gradient(50% 40% at 85% 90%, rgba(0,229,255,0.08), transparent 60%),
+    var(--bg-deep);
+  color:var(--text-hi);
+  font-family:var(--font-body);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:32px 16px 56px;
+  overflow-x:hidden;
+}
+
+button{font-family:inherit;}
+:focus-visible{outline:2px solid var(--neon-cyan);outline-offset:3px;border-radius:6px;}
+
+/* ============================================================
+   1. ESCENARIO / TÍTULO
+   ============================================================ */
+.stage{
+  width:100%;
+  max-width:560px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  gap:6px;
+}
+
+.eyebrow{
+  font-family:var(--font-body);
+  font-weight:600;
+  letter-spacing:.35em;
+  text-transform:uppercase;
+  font-size:12px;
+  color:var(--neon-cyan);
+  text-shadow:0 0 12px rgba(0,229,255,.6);
+  margin-bottom:2px;
+}
+
+.title{
+  font-family:var(--font-display);
+  font-weight:900;
+  font-size:clamp(28px,7vw,42px);
+  letter-spacing:.03em;
+  margin:0 0 4px;
+  background:linear-gradient(90deg,var(--neon-cyan),var(--neon-magenta) 55%,var(--neon-violet));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  filter:drop-shadow(0 0 18px rgba(255,46,154,.25));
+}
+
+.subtitle{
+  font-size:15px;
+  color:var(--text-mid);
+  max-width:380px;
+  margin:0 0 28px;
+  line-height:1.5;
+}
+
+/* ============================================================
+   2. CONTENEDOR DE LA RULETA
+   ============================================================ */
+.wheel-wrap{
+  position:relative;
+  width:min(88vw,420px);
+  aspect-ratio:1/1;
+  margin:12px auto 30px;
+}
+
+/* --- Anillo de luces tipo "marquesina" de show --- */
+.bulb-ring{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+.bulb{
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--gold);
+  opacity:.14;
+  box-shadow:0 0 2px rgba(247,201,72,.4);
+  transition:box-shadow .12s linear;
+}
+.bulb.lit{
+  background:#fff6dc;
+  box-shadow:0 0 10px 3px rgba(247,201,72,.9), 0 0 22px 6px rgba(255,46,154,.35);
+}
+
+/* --- Base / pedestal (sombra cinematográfica) --- */
+.wheel-wrap::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:-22px;
+  transform:translateX(-50%);
+  width:72%;
+  height:26px;
+  background:radial-gradient(closest-side, rgba(0,0,0,.65), transparent 75%);
+  filter:blur(2px);
+  z-index:0;
+}
+
+/* --- Disco de la ruleta --- */
+.wheel-disc{
+  position:absolute;
+  inset:9%;
+  border-radius:50%;
+  transform-origin:50% 50%;
+  will-change:transform;
+  filter:drop-shadow(0 10px 30px rgba(0,0,0,.55));
+}
+.wheel-disc svg{display:block;width:100%;height:100%;}
+
+.wheel-rim{
+  position:absolute;
+  inset:6.5%;
+  border-radius:50%;
+  pointer-events:none;
+  border:3px solid rgba(255,255,255,.06);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.03) inset,
+    0 0 34px 4px rgba(183,132,255,.20),
+    0 0 60px 10px rgba(0,229,255,.10);
+}
+
+.segment-label{
+  font-family:var(--font-display);
+  font-weight:700;
+  fill:#14141a;
+  paint-order:stroke;
+  user-select:none;
+}
+.segment-icon{
+  /* font-size se calcula dinámicamente en JS según la cantidad de segmentos */
+  user-select:none;
+}
+
+/* --- Puntero / indicador --- */
+.pointer{
+  position:absolute;
+  top:-2px;
+  left:50%;
+  width:34px;
+  height:40px;
+  transform:translateX(-50%);
+  transform-origin:50% 6%;
+  z-index:5;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));
+}
+.pointer svg{width:100%;height:100%;display:block;}
+@keyframes pointerTick{
+  0%{transform:translateX(-50%) rotate(0deg);}
+  30%{transform:translateX(-50%) rotate(-14deg);}
+  60%{transform:translateX(-50%) rotate(9deg);}
+  100%{transform:translateX(-50%) rotate(0deg);}
+}
+.pointer.tick{animation:pointerTick .18s ease-out;}
+
+/* --- Hub central = botón GIRAR --- */
+.hub{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:27%;
+  aspect-ratio:1/1;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.18);
+  background:
+    radial-gradient(circle at 35% 30%, #2b2b34, var(--bg-panel) 65%);
+  color:var(--text-hi);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  cursor:pointer;
+  z-index:6;
+  box-shadow:
+    0 0 0 6px rgba(20,20,24,.9),
+    0 0 22px 4px rgba(0,229,255,.35),
+    0 0 46px 10px rgba(255,46,154,.18),
+    inset 0 0 14px rgba(255,255,255,.05);
+  transition:transform .15s ease, box-shadow .2s ease, filter .2s ease;
+}
+.hub:hover{
+  transform:translate(-50%,-50%) scale(1.045);
+  box-shadow:
+    0 0 0 6px rgba(20,20,24,.9),
+    0 0 30px 8px rgba(0,229,255,.55),
+    0 0 60px 16px rgba(255,46,154,.30),
+    inset 0 0 14px rgba(255,255,255,.08);
+}
+.hub:active{transform:translate(-50%,-50%) scale(.97);}
+.hub[disabled]{cursor:not-allowed;filter:saturate(.7) brightness(.9);}
+.hub[disabled]:hover{transform:translate(-50%,-50%);}
+
+.hub-label{
+  font-family:var(--font-display);
+  font-weight:800;
+  font-size:clamp(13px,3.6vw,17px);
+  letter-spacing:.06em;
+}
+.hub-sub{
+  font-size:10px;
+  color:var(--text-dim);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+@keyframes hubPulse{
+  0%,100%{box-shadow:0 0 0 6px rgba(20,20,24,.9),0 0 22px 4px rgba(0,229,255,.35),0 0 46px 10px rgba(255,46,154,.18),inset 0 0 14px rgba(255,255,255,.05);}
+  50%{box-shadow:0 0 0 6px rgba(20,20,24,.9),0 0 34px 10px rgba(0,229,255,.6),0 0 64px 18px rgba(255,46,154,.32),inset 0 0 14px rgba(255,255,255,.08);}
+}
+.hub.idle-pulse{animation:hubPulse 2.6s ease-in-out infinite;}
+
+.wheel-wrap.spinning .hub{filter:saturate(.85);}
+.wheel-wrap.landed .wheel-rim{
+  animation:landFlash .9s ease-out 1;
+}
+@keyframes landFlash{
+  0%{box-shadow:0 0 0 1px rgba(255,255,255,.03) inset,0 0 34px 4px rgba(183,132,255,.2),0 0 60px 10px rgba(0,229,255,.1);}
+  35%{box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 0 60px 18px var(--land-glow,#ffc93f),0 0 110px 30px var(--land-glow,#ffc93f);}
+  100%{box-shadow:0 0 0 1px rgba(255,255,255,.03) inset,0 0 34px 4px rgba(183,132,255,.2),0 0 60px 10px rgba(0,229,255,.1);}
+}
+
+/* ============================================================
+   3. FOOTER / NOTA
+   ============================================================ */
+.hint{
+  font-size:12.5px;
+  color:var(--text-dim);
+  margin-top:2px;
+}
+.hint kbd{
+  background:var(--bg-panel-2);
+  border:1px solid var(--line);
+  border-radius:4px;
+  padding:1px 6px;
+  font-family:var(--font-body);
+}
+
+/* ============================================================
+   4. MODAL
+   ============================================================ */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(6,6,9,.72);
+  backdrop-filter:blur(6px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:50;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s ease;
+}
+.modal-overlay.open{opacity:1;pointer-events:auto;}
+
+.modal-card{
+  --accent:#ffc93f;
+  position:relative;
+  width:100%;
+  max-width:380px;
+  background:linear-gradient(160deg,var(--bg-panel-2),var(--bg-panel));
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:34px 26px 26px;
+  text-align:center;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.55),
+    0 0 0 1px rgba(255,255,255,.03) inset,
+    0 0 40px -6px var(--accent);
+  transform:translateY(18px) scale(.94);
+  opacity:0;
+  transition:transform .32s cubic-bezier(.2,.9,.25,1.2), opacity .28s ease;
+}
+.modal-overlay.open .modal-card{
+  transform:translateY(0) scale(1);
+  opacity:1;
+}
+
+.modal-close{
+  position:absolute;
+  top:14px;
+  right:14px;
+  width:30px;
+  height:30px;
+  border-radius:50%;
+  border:1px solid var(--line);
+  background:var(--bg-panel-2);
+  color:var(--text-mid);
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .15s ease, color .15s ease, transform .15s ease;
+}
+.modal-close:hover{background:var(--bg-panel);color:var(--text-hi);transform:rotate(90deg);}
+
+.modal-icon{
+  width:64px;
+  height:64px;
+  margin:0 auto 14px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:30px;
+  background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%), var(--bg-panel);
+  border:1px solid color-mix(in srgb, var(--accent) 50%, var(--line));
+  box-shadow:0 0 26px -4px var(--accent);
+}
+
+.modal-eyebrow{
+  font-size:11px;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+  margin-bottom:6px;
+}
+
+.modal-title{
+  font-family:var(--font-display);
+  font-weight:800;
+  font-size:22px;
+  margin:0 0 12px;
+  letter-spacing:.01em;
+}
+
+.modal-desc{
+  font-size:15.5px;
+  line-height:1.55;
+  color:var(--text-mid);
+  margin:0 0 24px;
+}
+
+.modal-cta{
+  width:100%;
+  padding:13px 18px;
+  border-radius:12px;
+  border:none;
+  background:linear-gradient(90deg,var(--accent),color-mix(in srgb, var(--accent) 60%, #ff2e9a));
+  color:#141418;
+  font-family:var(--font-display);
+  font-weight:800;
+  letter-spacing:.04em;
+  font-size:14px;
+  cursor:pointer;
+  transition:filter .15s ease, transform .15s ease;
+}
+.modal-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}
+.modal-cta:active{transform:translateY(0);}
+
+/* ============================================================
+   5. RESPONSIVE Y ACCESIBILIDAD
+   ============================================================ */
+@media (max-width:380px){
+  .subtitle{margin-bottom:18px;}
+  .wheel-wrap{margin-bottom:20px;}
+}
+
+@media (prefers-reduced-motion: reduce){
+  .hub.idle-pulse{animation:none;}
+  .bulb{transition:none;}
+  .pointer.tick{animation:none;}
+  .wheel-wrap.landed .wheel-rim{animation:none;}
+  .modal-card{transition:opacity .2s ease;}
+  .wheel-disc{transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="eyebrow">Bienvenidos a la</div>
+  <h1 class="title">Ruleta de Consecuencias</h1>
+  <p class="subtitle">Gira la ruleta y descubre tu consecuencia. Toca el centro o presiona <kbd>Enter</kbd> para comenzar.</p>
+
+  <div class="wheel-wrap" id="wheelWrap">
+    <div class="bulb-ring" id="bulbRing" aria-hidden="true"></div>
+    <div class="wheel-rim" aria-hidden="true"></div>
+    <div class="wheel-disc" id="wheelDisc"><!-- SVG inyectado por JS --></div>
+
+    <div class="pointer" id="pointer" aria-hidden="true">
+      <svg viewBox="0 0 34 40">
+        <defs>
+          <linearGradient id="ptrGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fff6dc"/>
+            <stop offset="100%" stop-color="#f7c948"/>
+          </linearGradient>
+        </defs>
+        <path d="M17 40 C 8 26, 3 20, 3 12 A14 14 0 0 1 31 12 C 31 20, 26 26, 17 40 Z" fill="url(#ptrGrad)" stroke="#0a0a0d" stroke-width="1.5"/>
+        <circle cx="17" cy="13" r="5" fill="#0a0a0d" opacity=".35"/>
+      </svg>
+    </div>
+
+    <button class="hub idle-pulse" id="spinBtn" type="button" aria-label="Girar la ruleta">
+      <span class="hub-label" id="hubLabel">GIRAR</span>
+      <span class="hub-sub">Toca aquí</span>
+    </button>
+  </div>
+
+  <p class="hint">Los datos de la ruleta se editan en <code>ROULETTE_DATA</code> dentro del script.</p>
+</div>
+
+<!-- ================= MODAL DE RESULTADO ================= -->
+<div class="modal-overlay" id="modalOverlay" role="presentation">
+  <div class="modal-card" id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="modal-close" id="modalClose" type="button" aria-label="Cerrar">✕</button>
+    <div class="modal-icon" id="modalIcon">🎯</div>
+    <div class="modal-eyebrow">Tu consecuencia</div>
+    <h2 class="modal-title" id="modalTitle">—</h2>
+    <p class="modal-desc" id="modalDesc">—</p>
+    <button class="modal-cta" id="modalOk" type="button">Entendido</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   1. DATOS DE LA RULETA
+   Edita, agrega o quita objetos de este arreglo (funciona con
+   cualquier cantidad, probado hasta 58) para personalizar los
+   retos. El diseño (ángulos, tamaño de fuente, orientación del
+   texto, y si se muestran o no las etiquetas dentro de la rueda)
+   se recalcula automáticamente según la cantidad de elementos.
+   "label" debe ser corto (1-2 palabras) porque es lo que se
+   dibuja dentro de la porción de la rueda cuando N ≤ 40; con más
+   segmentos que eso, la etiqueta se oculta y solo se ve el
+   ícono. El texto completo siempre va en "description" y
+   aparece en el modal.
+   ============================================================ */
+const ROULETTE_DATA = [
+  { label:"Abdominales",        color:"var(--neon-cyan)",    icon:"💪", description:"Haz 10 abdominales." },
+  { label:"Imitar animal",      color:"var(--neon-magenta)", icon:"🐒", description:"Imita a un animal y que los demás adivinen cuál es." },
+  { label:"Dibujo a ciegas",    color:"var(--neon-amber)",   icon:"🎨", description:"Haz un dibujo en el tablero con los ojos cerrados." },
+  { label:"Sueño frustrado",    color:"var(--neon-violet)",  icon:"😴", description:"Haz una mímica de tu sueño frustrado." },
+  { label:"Modo robot",         color:"var(--neon-lime)",    icon:"🤖", description:"Actúa como robot durante 20 segundos." },
+  { label:"Flexiones",          color:"var(--neon-orange)",  icon:"🏋️", description:"Haz 5 flexiones de brazos." },
+  { label:"Secreto al profe",   color:"var(--neon-blue)",    icon:"🤫", description:"Cuéntale un secreto personal al profesor." },
+  { label:"Canción de cuna",    color:"var(--neon-rose)",    icon:"🎵", description:"Canta una canción de cuna." },
+  { label:"Piropo",             color:"var(--neon-cyan)",    icon:"😘", description:"Hazle un piropo a un compañero." },
+  { label:"Malabares",          color:"var(--neon-magenta)", icon:"🤹", description:"Haz malabares con tres pelotas al tiempo o inténtalo." },
+  { label:"Pose de héroe",      color:"var(--neon-amber)",   icon:"🦸", description:"Haz una pose de superhéroe y mantenerla por 10 segundos." },
+  { label:"Poema express",      color:"var(--neon-violet)",  icon:"✍️", description:"Inventa un poema sobre lo que quieras." },
+  { label:"Mayor miedo",        color:"var(--neon-lime)",    icon:"😱", description:"Cuenta tu mayor miedo." },
+  { label:"Trova",              color:"var(--neon-orange)",  icon:"🎤", description:"Trova con una pista de fondo." },
+  { label:"Modo silencio",      color:"var(--neon-blue)",    icon:"🤐", description:"No puedes hablar en lo que resta de la clase." },
+  { label:"Oficio en casa",     color:"var(--neon-rose)",    icon:"🧹", description:"Haz mímica de tu oficio de la casa favorito." },
+  { label:"Amor platónico",     color:"var(--neon-cyan)",    icon:"💘", description:"Dinos quién es tu amor platónico." },
+  { label:"Última foto",        color:"var(--neon-magenta)", icon:"📸", description:"Muestra la última foto en tu teléfono a alguien." },
+  { label:"Último mensaje",     color:"var(--neon-amber)",   icon:"💬", description:"Lee en voz alta el último mensaje que recibiste." },
+  { label:"Meme guardado",      color:"var(--neon-violet)",  icon:"😂", description:"Muestra tu último meme guardado." },
+  { label:"Último sueño",       color:"var(--neon-lime)",    icon:"💭", description:"Cuenta lo último que soñaste." },
+  { label:"Momento vergonzoso", color:"var(--neon-orange)",  icon:"😳", description:"Cuenta tu último momento vergonzoso." },
+  { label:"Abrazo sorpresa",    color:"var(--neon-blue)",    icon:"🤗", description:"Abraza a la primera persona que veas." },
+  { label:"Peinado loco",       color:"var(--neon-rose)",    icon:"💇", description:"Hazte un peinado loco y sigue jugando así." },
+  { label:"La Macarena",        color:"var(--neon-cyan)",    icon:"💃", description:"Baila La Macarena con alguien más que no sea el profesor." },
+  { label:"Imitar pato",        color:"var(--neon-magenta)", icon:"🦆", description:"Imita a un pato en sonido y movimiento." },
+  { label:"Cede el reto",       color:"var(--neon-amber)",   icon:"👉", description:"Elige a otra persona para que pague el reto." },
+  { label:"Equilibrio",         color:"var(--neon-violet)",  icon:"🦩", description:"Haz equilibrio en un pie por 60 segundos." },
+  { label:"Vueltas de escoba",  color:"var(--neon-lime)",    icon:"🌀", description:"Dale 10 vueltas a la escoba." },
+  { label:"Baila con la escoba",color:"var(--neon-orange)",  icon:"🕺", description:"Baila con la escoba." },
+
+  // Los 20 retos adicionales del usuario
+  { label:"Talento",            color:"var(--neon-blue)",    icon:"✨", description:"Muestra un talento oculto que tengas." },
+  { label:"Autógrafos",         color:"var(--neon-rose)",    icon:"✍️", description:"Sal y pide tres autógrafos a personas random." },
+  { label:"Fiar chicle",        color:"var(--neon-cyan)",    icon:"🍬", description:"Ve a cafetería y pregunta si te fían un chicle." },
+  { label:"Modo niño",          color:"var(--neon-magenta)", icon:"👶", description:"Cuenta algo como si fueras un niño de 4 años." },
+  { label:"Adivinanza",         color:"var(--neon-amber)",   icon:"🤔", description:"Haz una adivinanza." },
+  { label:"Caballito",          color:"var(--neon-violet)",  icon:"🐎", description:"Carga a alguien en caballito." },
+  { label:"Disfraz",            color:"var(--neon-lime)",    icon:"🎭", description:"Disfrázate de algo de manera creativa." },
+  { label:"Estatua",            color:"var(--neon-orange)",  icon:"🗿", description:"Quédate como estatua durante tres rondas." },
+  { label:"Promesa",            color:"var(--neon-blue)",    icon:"🤝", description:"Hazle una promesa al grupo y cúmplela." },
+  { label:"Alfabeto veloz",     color:"var(--neon-rose)",    icon:"🔤", description:"Di el alfabeto lo más rápido que puedas." },
+  { label:"Último llanto",      color:"var(--neon-cyan)",    icon:"😢", description:"Cuéntanos cuál fue la última vez que lloraste." },
+  { label:"Alfabeto inverso",   color:"var(--neon-magenta)", icon:"🔄", description:"Di el alfabeto de atrás para adelante." },
+  { label:"Ballet",             color:"var(--neon-amber)",   icon:"🩰", description:"Baila ballet con música de fondo." },
+  { label:"En inglés",          color:"var(--neon-violet)",  icon:"🇬🇧", description:"Preséntate al grupo en inglés." },
+  { label:"Bailar Carranza",    color:"var(--neon-lime)",    icon:"🕺", description:"Baila Carranza con alguien más que no sea el profesor." },
+  { label:"Sin la A",           color:"var(--neon-orange)",  icon:"🚫", description:"Cuenta cuál es tu comida favorita sin usar la letra A." },
+  { label:"Piropo al profe",    color:"var(--neon-blue)",    icon:"😎", description:"Hazle un piropo al profesor." },
+  { label:"Abrazos triples",    color:"var(--neon-rose)",    icon:"🫂", description:"Escoge tres personas y abrázalas durante 15 segundos." },
+  { label:"Primer recuerdo",    color:"var(--neon-cyan)",    icon:"🧠", description:"Cuéntanos cuál es el primer recuerdo que tienes." },
+  { label:"Mejor chiste",       color:"var(--neon-magenta)", icon:"🤣", description:"Cuenta tu mejor chiste." },
+
+  // Los 8 retos filtrados y modificados
+  { label:"Entrevista",         color:"var(--neon-amber)",   icon:"🎤", description:"Entrevista a un objeto inanimado del salón durante 30 segundos." },
+  { label:"Acento",             color:"var(--neon-violet)",  icon:"🌍", description:"Preséntate ante el grupo con un acento extranjero." },
+  { label:"Cámara lenta",       color:"var(--neon-lime)",    icon:"🐌", description:"Camina en cámara lenta exagerada hasta el otro lado del salón y vuelve." },
+  { label:"Hazlos reír",        color:"var(--neon-orange)",  icon:"😂", description:"Tienes 15 segundos para lograr que alguien del grupo se ría." },
+  { label:"Caja de cristal",    color:"var(--neon-blue)",    icon:"📦", description:"Simula que estás atrapado en una caja de cristal (estilo mimo) por 20 segundos." },
+  { label:"Nuevo paso",         color:"var(--neon-rose)",    icon:"👟", description:"Inventa un nuevo paso de baile y enséñaselo a todos." },
+  { label:"Tararear",           color:"var(--neon-cyan)",    icon:"🎶", description:"Canta el estribillo de tu canción favorita sin usar palabras, solo tarareando." },
+  { label:"Contacto visual",    color:"var(--neon-magenta)", icon:"👀", description:"Mantén contacto visual con un compañero del género opuesto durante 10 segundos sin reírte." }
+];
+
+/* ============================================================
+   2. AUDIO MANAGER (IIFE interno, sin fugas al scope global)
+   Rutas de marcador de posición: reemplázalas por tus .mp3 reales.
+   ============================================================ */
+const AudioManager = (function(){
+  function makeAudio(src, volume){
+    let a = null;
+    try{
+      a = new Audio(src);
+      a.preload = "auto";
+      a.volume = volume;
+    }catch(e){ a = null; }
+    return a;
+  }
+
+  const sounds = {
+    sfx_tick:  makeAudio("assets/sounds/tick.mp3", 0.5),
+    sfx_land:  makeAudio("assets/sounds/land.mp3", 0.8),
+    sfx_click: makeAudio("assets/sounds/click.mp3", 0.6)
+  };
+
+  function safePlay(key){
+    const original = sounds[key];
+    if(!original) return;
+    try{
+      // Clonar permite reproducir sonidos superpuestos (p. ej. ticks rápidos)
+      const node = original.cloneNode ? original.cloneNode(true) : original;
+      node.currentTime = 0;
+      const p = node.play();
+      if(p && typeof p.catch === "function"){
+        p.catch(function(){ /* autoplay bloqueado o archivo ausente: silencioso */ });
+      }
+    }catch(err){
+      /* nunca romper la app por audio */
+    }
+  }
+
+  return {
+    tick:  function(){ safePlay("sfx_tick"); },
+    land:  function(){ safePlay("sfx_land"); },
+    click: function(){ safePlay("sfx_click"); }
+  };
+})();
+
+/* ============================================================
+   3. CONSTRUCCIÓN DEL SVG DE LA RULETA
+   ============================================================ */
+const N = ROULETTE_DATA.length;
+const SEG_ANGLE = 360 / N;
+const CX = 200, CY = 200, R = 196;
+
+// Tamaños tipográficos dinámicos: entre más segmentos, más angostas son las
+// porciones, así que el texto y el ícono deben encogerse proporcionalmente.
+// Con N=30 esto produce ~7px de etiqueta (dentro del rango 6-8px pedido).
+//
+// A partir de N=41 los segmentos (≈8.8° o menos) ya son demasiado angostos
+// para alojar una etiqueta legible incluso en orientación radial, así que
+// SHOW_LABELS se apaga y la porción solo muestra el emoji, más grande y
+// más cerca del borde exterior. El título y el texto completo del reto
+// siguen apareciendo en el modal al aterrizar, sin importar N.
+const SHOW_LABELS = N <= 40;
+const LABEL_FONT_SIZE = Math.max(6, Math.min(15, Math.round(200 / N)));
+const LABEL_RADIUS = R * 0.55;
+const ICON_FONT_SIZE = SHOW_LABELS
+  ? Math.max(9, Math.min(20, Math.round(260 / N)))
+  : Math.max(9, Math.min(13, Math.round(700 / N))); // ~11-13px para N≈58
+const ICON_RADIUS_FACTOR = SHOW_LABELS ? 0.86 : 0.90; // más cerca del borde sin etiqueta
+
+function polarToCartesian(cx, cy, r, angleDeg){
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function buildWheelSVG(){
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 400 400");
+
+  ROULETTE_DATA.forEach(function(item, i){
+    const start = i * SEG_ANGLE;
+    const end = start + SEG_ANGLE;
+    const p1 = polarToCartesian(CX, CY, R, start);
+    const p2 = polarToCartesian(CX, CY, R, end);
+    const largeArc = SEG_ANGLE > 180 ? 1 : 0;
+
+    const path = document.createElementNS(svgNS, "path");
+    const d = "M " + CX + " " + CY +
+              " L " + p1.x + " " + p1.y +
+              " A " + R + " " + R + " 0 " + largeArc + " 1 " + p2.x + " " + p2.y +
+              " Z";
+    path.setAttribute("d", d);
+    path.setAttribute("fill", item.color);
+    path.setAttribute("stroke", "#0a0a0d");
+    path.setAttribute("stroke-width", "3");
+    svg.appendChild(path);
+
+    const mid = start + SEG_ANGLE / 2;
+
+    // Icono: se posiciona sobre la línea radial del segmento, pero se deja
+    // SIN rotar para que el emoji siempre se vea "de pie" (rotarlo lo dejaría
+    // de cabeza en la mitad inferior de la rueda).
+    const iconPt = polarToCartesian(CX, CY, R * ICON_RADIUS_FACTOR, mid);
+    const iconText = document.createElementNS(svgNS, "text");
+    iconText.setAttribute("x", iconPt.x);
+    iconText.setAttribute("y", iconPt.y);
+    iconText.setAttribute("text-anchor", "middle");
+    iconText.setAttribute("dominant-baseline", "middle");
+    iconText.setAttribute("class", "segment-icon");
+    iconText.setAttribute("font-size", ICON_FONT_SIZE);
+    iconText.textContent = item.icon || "";
+    svg.appendChild(iconText);
+
+    // Etiqueta: orientación RADIAL real (corre a lo largo del radio, del
+    // centro hacia el borde), no tangencial. Se ancla en un punto sobre la
+    // línea radial del segmento (labelPt) y se rota ese mismo punto en
+    // (mid - 90)°, que es el ángulo que alinea el eje horizontal del texto
+    // con la dirección radial hacia afuera en cada punto de la rueda. Como
+    // el pivote de rotación es el propio punto de anclaje, la posición del
+    // texto no se mueve: solo cambia su orientación, evitando que invada
+    // los segmentos vecinos incluso con porciones muy angostas.
+    //
+    // Con N > 40 los segmentos son demasiado angostos incluso para esto,
+    // así que la etiqueta se omite por completo y solo queda el emoji;
+    // el texto completo lo sigue mostrando el modal.
+    if(SHOW_LABELS){
+      const labelPt = polarToCartesian(CX, CY, LABEL_RADIUS, mid);
+      const label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", labelPt.x);
+      label.setAttribute("y", labelPt.y);
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("dominant-baseline", "middle");
+      label.setAttribute("class", "segment-label");
+      label.setAttribute("font-size", LABEL_FONT_SIZE);
+      label.setAttribute("transform", "rotate(" + (mid - 90) + " " + labelPt.x + " " + labelPt.y + ")");
+      label.textContent = item.label;
+      svg.appendChild(label);
+    }
+  });
+
+  // Círculo central decorativo (queda debajo del botón hub real)
+  const core = document.createElementNS(svgNS, "circle");
+  core.setAttribute("cx", CX);
+  core.setAttribute("cy", CY);
+  core.setAttribute("r", 46);
+  core.setAttribute("fill", "#14141a");
+  core.setAttribute("stroke", "rgba(255,255,255,.12)");
+  core.setAttribute("stroke-width", "2");
+  svg.appendChild(core);
+
+  return svg;
+}
+
+const wheelDisc = document.getElementById("wheelDisc");
+wheelDisc.appendChild(buildWheelSVG());
+
+/* ============================================================
+   4. ANILLO DE LUCES (efecto "marquesina" de show)
+   ============================================================ */
+const BULB_COUNT = 30;
+const bulbRing = document.getElementById("bulbRing");
+const wheelWrapEl = document.getElementById("wheelWrap");
+const bulbs = [];
+
+for(let i = 0; i < BULB_COUNT; i++){
+  const b = document.createElement("div");
+  b.className = "bulb";
+  bulbRing.appendChild(b);
+  bulbs.push(b);
+}
+
+function layoutBulbs(){
+  const rect = wheelWrapEl.getBoundingClientRect();
+  const ringRadius = (rect.width / 2) + 15;
+  const step = 360 / BULB_COUNT;
+  bulbs.forEach(function(b, i){
+    b.style.transform = "translate(-50%,-50%) rotate(" + (i * step) + "deg) translateY(-" + ringRadius + "px)";
+  });
+}
+layoutBulbs();
+
+let resizeTimer = null;
+window.addEventListener("resize", function(){
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(layoutBulbs, 120);
+});
+
+// Bucle de "persecución" de luces (más rápido mientras la ruleta gira)
+let isSpinning = false;
+const TRAIL_LEN = 5;
+function chaseLoop(ts){
+  const speed = isSpinning ? 42 : 110; // ms por paso
+  const head = Math.floor(ts / speed) % BULB_COUNT;
+  for(let i = 0; i < BULB_COUNT; i++){
+    let dist = head - i;
+    if(dist < 0) dist += BULB_COUNT;
+    if(dist < TRAIL_LEN){
+      bulbs[i].classList.toggle("lit", dist === 0);
+      bulbs[i].style.opacity = String(1 - dist / TRAIL_LEN);
+    } else {
+      bulbs[i].classList.remove("lit");
+      bulbs[i].style.opacity = "0.14";
+    }
+  }
+  requestAnimationFrame(chaseLoop);
+}
+requestAnimationFrame(chaseLoop);
+
+/* ============================================================
+   5. FÍSICA DE GIRO
+   ============================================================ */
+const spinBtn = document.getElementById("spinBtn");
+const hubLabel = document.getElementById("hubLabel");
+const pointerEl = document.getElementById("pointer");
+
+let currentRotation = 0;
+let lastTickIndex = -1;
+
+function easeOutQuint(t){
+  return 1 - Math.pow(1 - t, 5);
+}
+
+function normalizedIndexFromRotation(rotationDeg){
+  const pointerAngleInWheel = ((360 - (rotationDeg % 360)) % 360 + 360) % 360;
+  return Math.floor(pointerAngleInWheel / SEG_ANGLE) % N;
+}
+
+function triggerTick(){
+  AudioManager.tick();
+  pointerEl.classList.remove("tick");
+  // Forzar reflow para poder reiniciar la animación
+  void pointerEl.offsetWidth;
+  pointerEl.classList.add("tick");
+}
+
+function spin(){
+  if(isSpinning) return;
+  isSpinning = true;
+  lastTickIndex = normalizedIndexFromRotation(currentRotation);
+
+  spinBtn.setAttribute("disabled", "true");
+  spinBtn.classList.remove("idle-pulse");
+  hubLabel.textContent = "GIRANDO…";
+  wheelWrapEl.classList.add("spinning");
+  wheelWrapEl.classList.remove("landed");
+
+  // --- Calcular el ángulo final de destino ---
+  const targetIndex = Math.floor(Math.random() * N);
+  const jitter = (Math.random() * 0.56 - 0.28) * SEG_ANGLE; // se aleja de los bordes del segmento
+  let desiredTheta = targetIndex * SEG_ANGLE + SEG_ANGLE / 2 + jitter;
+  desiredTheta = ((desiredTheta % 360) + 360) % 360;
+
+  const targetMod = ((360 - desiredTheta) % 360 + 360) % 360;
+  const extraSpins = 6 + Math.floor(Math.random() * 4); // 6 a 9 vueltas completas
+  const baseline = currentRotation - (currentRotation % 360);
+
+  let finalRotation = baseline + extraSpins * 360 + targetMod;
+  while(finalRotation <= currentRotation) finalRotation += 360;
+
+  const startRotation = currentRotation;
+  const delta = finalRotation - startRotation;
+  const duration = 4400 + Math.random() * 700;
+  let startTime = null;
+
+  function frame(ts){
+    if(startTime === null) startTime = ts;
+    const elapsed = ts - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = easeOutQuint(t);
+    const rotationNow = startRotation + delta * eased;
+
+    wheelDisc.style.transform = "rotate(" + rotationNow + "deg)";
+
+    const idxNow = normalizedIndexFromRotation(rotationNow);
+    if(idxNow !== lastTickIndex){
+      lastTickIndex = idxNow;
+      triggerTick();
+    }
+
+    if(t < 1){
+      requestAnimationFrame(frame);
+    } else {
+      finishSpin(finalRotation);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function finishSpin(finalRotation){
+  currentRotation = finalRotation;
+  wheelDisc.style.transform = "rotate(" + finalRotation + "deg)";
+  isSpinning = false;
+  wheelWrapEl.classList.remove("spinning");
+  wheelWrapEl.classList.add("landed");
+
+  const landedIndex = normalizedIndexFromRotation(finalRotation);
+  const result = ROULETTE_DATA[landedIndex];
+
+  AudioManager.land();
+  document.documentElement.style.setProperty("--land-glow", resolveColor(result.color));
+
+  spinBtn.removeAttribute("disabled");
+  hubLabel.textContent = "GIRAR";
+  spinBtn.classList.add("idle-pulse");
+
+  openModal(result);
+}
+
+function resolveColor(cssVarExpr){
+  // Convierte "var(--neon-x)" en el valor real de color para usarlo en JS/CSS inline
+  const match = /var\((--[a-z0-9-]+)\)/i.exec(cssVarExpr);
+  if(match){
+    return getComputedStyle(document.documentElement).getPropertyValue(match[1]).trim() || "#ffc93f";
+  }
+  return cssVarExpr;
+}
+
+spinBtn.addEventListener("click", function(){
+  if(isSpinning) return;
+  AudioManager.click();
+  spin();
+});
+
+/* ============================================================
+   6. MODAL DE RESULTADO
+   ============================================================ */
+const modalOverlay = document.getElementById("modalOverlay");
+const modalCard = document.getElementById("modalCard");
+const modalClose = document.getElementById("modalClose");
+const modalOk = document.getElementById("modalOk");
+const modalIcon = document.getElementById("modalIcon");
+const modalTitle = document.getElementById("modalTitle");
+const modalDesc = document.getElementById("modalDesc");
+
+let lastFocused = null;
+
+function openModal(item){
+  const accent = resolveColor(item.color);
+  modalCard.style.setProperty("--accent", accent);
+  modalIcon.textContent = item.icon || "🎯";
+  modalTitle.textContent = item.label;
+  modalDesc.textContent = item.description || "";
+
+  lastFocused = document.activeElement;
+  modalOverlay.classList.add("open");
+  document.body.style.overflow = "hidden";
+
+  setTimeout(function(){ modalClose.focus(); }, 50);
+}
+
+function closeModal(){
+  AudioManager.click();
+  modalOverlay.classList.remove("open");
+  document.body.style.overflow = "";
+  if(lastFocused && typeof lastFocused.focus === "function"){
+    lastFocused.focus();
+  }
+}
+
+modalClose.addEventListener("click", closeModal);
+modalOk.addEventListener("click", closeModal);
+modalOverlay.addEventListener("click", function(e){
+  if(e.target === modalOverlay) closeModal();
+});
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape" && modalOverlay.classList.contains("open")){
+    closeModal();
+  }
+});
+
+})();
+</script>
+</body>
+</html>
